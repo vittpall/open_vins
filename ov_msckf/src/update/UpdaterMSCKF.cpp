@@ -282,6 +282,14 @@ void UpdaterMSCKF::update(std::shared_ptr<State> state, std::vector<std::shared_
   Eigen::MatrixXd R_big = _options.sigma_pix_sq * Eigen::MatrixXd::Identity(res_big.rows(), res_big.rows());
 
   // 6. With all good features update the state
+  // Compute NIS = res^T * S^-1 * res / dof before the update (S = H*P*H^T + R)
+  {
+    Eigen::MatrixXd P_small = StateHelper::get_marginal_covariance(state, Hx_order_big);
+    Eigen::MatrixXd S = Hx_big * P_small * Hx_big.transpose() + R_big;
+    S = (S + S.transpose()) * 0.5; // ensure symmetry for llt
+    Eigen::VectorXd Sinv_res = S.llt().solve(res_big);
+    _last_nis = res_big.dot(Sinv_res) / (double)res_big.rows();
+  }
   StateHelper::EKFUpdate(state, Hx_order_big, Hx_big, res_big, R_big);
   rT5 = boost::posix_time::microsec_clock::local_time();
 
