@@ -1,4 +1,4 @@
-/*
+  /*
  * OpenVINS: An Open Platform for Visual-Inertial Research
  * Copyright (C) 2018-2023 Patrick Geneva
  * Copyright (C) 2018-2023 Guoquan Huang
@@ -22,6 +22,7 @@
 #include "ROS2Visualizer.h"
 
 #include "core/VioManager.h"
+#include "update/UpdaterMSCKF.h"
 #include "ros/ROSVisualizerHelper.h"
 #include "sim/Simulator.h"
 #include "state/Propagator.h"
@@ -71,6 +72,12 @@ ROS2Visualizer::ROS2Visualizer(std::shared_ptr<rclcpp::Node> node, std::shared_p
   PRINT_DEBUG("Publishing: %s\n", pub_posegt->get_topic_name());
   pub_pathgt = node->create_publisher<nav_msgs::msg::Path>("pathgt", 2);
   PRINT_DEBUG("Publishing: %s\n", pub_pathgt->get_topic_name());
+
+  // Fisher Information Matrix trace and NIS
+  pub_fim_trace = node->create_publisher<std_msgs::msg::Float64>("fim_trace", 2);
+  PRINT_DEBUG("Publishing: %s\n", pub_fim_trace->get_topic_name());
+  pub_nis = node->create_publisher<std_msgs::msg::Float64>("nis", 2);
+  PRINT_DEBUG("Publishing: %s\n", pub_nis->get_topic_name());
 
   // Loop closure publishers
   pub_loop_pose = node->create_publisher<nav_msgs::msg::Odometry>("loop_pose", 2);
@@ -641,6 +648,19 @@ void ROS2Visualizer::publish_state() {
     arrIMU.poses.push_back(poses_imu.at(i));
   }
   pub_pathimu->publish(arrIMU);
+
+  // Publish Fisher Information Matrix trace
+  Eigen::MatrixXd fim = StateHelper::get_FIM();
+  if (fim.rows() > 0) {
+    std_msgs::msg::Float64 fim_msg;
+    fim_msg.data = fim.trace();
+    pub_fim_trace->publish(fim_msg);
+  }
+
+  // Publish NIS (average chi2/dof over accepted features from last MSCKF update)
+  std_msgs::msg::Float64 nis_msg;
+  nis_msg.data = _app->get_updaterMSCKF()->get_last_nis();
+  pub_nis->publish(nis_msg);
 }
 
 void ROS2Visualizer::publish_images() {

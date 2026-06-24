@@ -23,6 +23,8 @@
 
 #include "state/State.h"
 
+Eigen::MatrixXd ov_msckf::StateHelper::_FIM = Eigen::MatrixXd(0, 0);
+
 #include "types/Landmark.h"
 #include "utils/colors.h"
 #include "utils/print.h"
@@ -160,7 +162,26 @@ void StateHelper::EKFUpdate(std::shared_ptr<State> state, const std::vector<std:
   Eigen::MatrixXd Sinv = Eigen::MatrixXd::Identity(R.rows(), R.rows());
   S.selfadjointView<Eigen::Upper>().llt().solveInPlace(Sinv);
   Eigen::MatrixXd K = M_a * Sinv.selfadjointView<Eigen::Upper>();
-  // Eigen::MatrixXd K = M_a * S.inverse();
+
+  // Fisher Information Matrix: J += H^T * R^-1 * H (accumulated over updates)
+  // R is symmetric positive definite so we solve R^-1 * H via LLT.
+  // Note: H is the *small* jacobian whose columns only span the H_order variables,
+  // so FIM_update lives in the marginal space and must be scattered into the
+  // full-state _FIM using each variable's global id (same as the M_a assembly above).
+  Eigen::MatrixXd Rinv = Eigen::MatrixXd::Identity(R.rows(), R.rows());
+  R.selfadjointView<Eigen::Upper>().llt().solveInPlace(Rinv);
+  Eigen::MatrixXd FIM_update = H.transpose() * Rinv.selfadjointView<Eigen::Upper>() * H;
+  if (_FIM.rows() != (int)state->_Cov.rows()) {
+    _FIM = Eigen::MatrixXd::Zero(state->_Cov.rows(), state->_Cov.cols());
+  }
+  for (size_t i = 0; i < H_order.size(); i++) {
+    const std::shared_ptr<Type> &var_i = H_order[i];
+    for (size_t j = 0; j < H_order.size(); j++) {
+      const std::shared_ptr<Type> &var_j = H_order[j];
+      _FIM.block(var_i->id(), var_j->id(), var_i->size(), var_j->size()).noalias() +=
+          FIM_update.block(H_id[i], H_id[j], var_i->size(), var_j->size());
+    }
+  }
 
   // Update Covariance
   state->_Cov.triangularView<Eigen::Upper>() -= K * M_a.transpose();

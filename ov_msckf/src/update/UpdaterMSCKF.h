@@ -67,6 +67,10 @@ public:
    */
   void update(std::shared_ptr<State> state, std::vector<std::shared_ptr<ov_core::Feature>> &feature_vec);
 
+  /// Returns the average NIS (chi2 / dof) across all accepted features from the last update() call.
+  /// Values near 1.0 indicate a consistent filter; >> 1.0 means overconfident.
+  double get_last_nis() const { return _last_nis; }
+
 protected:
   /// Options used during update
   UpdaterOptions _options;
@@ -76,6 +80,9 @@ protected:
 
   /// Chi squared 95th percentile table (lookup would be size of residual)
   std::map<int, double> chi_squared_table;
+
+  /// Average NIS from the last update call (chi2 / dof, averaged over accepted features)
+  double _last_nis = 0.0;
 };
 
 } // namespace ov_msckf

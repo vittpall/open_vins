@@ -229,7 +229,24 @@ public:
    */
   static void marginalize_slam(std::shared_ptr<State> state);
 
+  /**
+   * @brief Returns the accumulated Fisher Information Matrix since the last reset.
+   *
+   * Computed as J += H^T * R^-1 * H at every EKFUpdate call.
+   * Dimensions match the full state covariance (n x n).
+   */
+  static Eigen::MatrixXd get_FIM() { return _FIM; }
+
+  /**
+   * @brief Resets the accumulated Fisher Information Matrix to zero.
+   * Call this at the start of each evaluation window.
+   * @param size Full state dimension (rows/cols of the covariance matrix)
+   */
+  static void reset_FIM(int size) { _FIM = Eigen::MatrixXd::Zero(size, size); }
+
 private:
+  static Eigen::MatrixXd _FIM;
+
   /**
    * All function in this class should be static.
    * Thus an instance of this class cannot be created.

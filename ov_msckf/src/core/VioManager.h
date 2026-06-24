@@ -136,6 +136,9 @@ public:
     feat_tracks_uvd = active_tracks_uvd;
   }
 
+  /// Returns the MSCKF updater
+  std::shared_ptr<UpdaterMSCKF> get_updaterMSCKF() { return updaterMSCKF; }
+
 protected:
   /**
    * @brief Given a new set of camera images, this will track them.
